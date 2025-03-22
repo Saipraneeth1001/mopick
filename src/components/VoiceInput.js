@@ -1,71 +1,88 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './VoiceInput.css';
 
 const VoiceInput = () => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState('');
+  const [recognition, setRecognition] = useState(null);
 
-  useEffect(() => {
-    // Check if browser supports speech recognition
+  const startListening = () => {
     if (!('webkitSpeechRecognition' in window)) {
       setError('Speech recognition is not supported in this browser.');
       return;
     }
 
-    const recognition = new window.webkitSpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    const recognitionInstance = new window.webkitSpeechRecognition();
+    recognitionInstance.continuous = true;
+    recognitionInstance.interimResults = false; // We only want final results
+    recognitionInstance.lang = 'en-US'; // Setting language to English
 
-    recognition.onstart = () => {
+    recognitionInstance.onstart = () => {
       setIsListening(true);
       setError('');
+      setTranscript(''); // Clear previous transcript
     };
 
-    recognition.onresult = (event) => {
-      const current = event.resultIndex;
-      const transcript = event.results[current][0].transcript;
-      setTranscript(transcript);
+    recognitionInstance.onresult = (event) => {
+      const finalTranscript = Array.from(event.results)
+        .map(result => result[0].transcript)
+        .join(' ');
+      setTranscript(finalTranscript);
     };
 
-    recognition.onerror = (event) => {
+    recognitionInstance.onerror = (event) => {
       setError(`Error occurred: ${event.error}`);
       setIsListening(false);
     };
 
-    recognition.onend = () => {
-      setIsListening(false);
-    };
+    setRecognition(recognitionInstance);
+    recognitionInstance.start();
+  };
 
-    return () => {
+  const stopListening = () => {
+    if (recognition) {
       recognition.stop();
-    };
-  }, []);
-
-  const toggleListening = () => {
-    if (isListening) {
-      window.webkitSpeechRecognition.stop();
-    } else {
-      window.webkitSpeechRecognition.start();
+      setIsListening(false);
     }
   };
 
   return (
     <div className="voice-input-container">
-      <h1>Voice Input Demo</h1>
+      <h1>What do you wanna watch today?</h1>
+      
       <div className="voice-controls">
-        <button 
-          onClick={toggleListening}
-          className={`voice-button ${isListening ? 'listening' : ''}`}
-        >
-          {isListening ? 'Stop Listening' : 'Start Listening'}
-        </button>
+        {!isListening ? (
+          <button 
+            onClick={startListening}
+            className="voice-button"
+          >
+            Click to Speak
+          </button>
+        ) : (
+          <button 
+            onClick={stopListening}
+            className="voice-button listening"
+          >
+            Finish
+          </button>
+        )}
       </div>
+
       {error && <div className="error-message">{error}</div>}
-      <div className="transcript-container">
-        <h2>Your Speech:</h2>
-        <p>{transcript || 'Start speaking...'}</p>
-      </div>
+      
+      {transcript && (
+        <div className="transcript-container">
+          <h2>Your Speech:</h2>
+          <p>{transcript}</p>
+        </div>
+      )}
+
+      {isListening && (
+        <div className="status-message">
+          Listening....
+        </div>
+      )}
     </div>
   );
 };
