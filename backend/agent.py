@@ -1,17 +1,18 @@
-from agno.agent import Agent, RunResponse
+from agno.agent import Agent
 from agno.models.anthropic import Claude
 from agno.playground import Playground, serve_playground_app
 from agno.storage.agent.sqlite import SqliteAgentStorage
 from omdb_tools import OMDBTools
-from pydantic import BaseModel
-from typing import List, Optional, Iterator
-
+from pydantic import BaseModel, Field
+from typing import List, Optional
 import os
 from dotenv import load_dotenv
+import json
+
 load_dotenv()
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-agent_storage: str = "tmp/agents.db"
+agent_storage = "agent_storage.db"
 
 class MovieItem(BaseModel):
     title: str
@@ -19,16 +20,13 @@ class MovieItem(BaseModel):
     rating: float
     language: str
     genre: str
-    director: str
-    plot: Optional[str] = None
-    awards: Optional[str] = None
+    # director: str
+    # plot: Optional[str] = None
+    # awards: Optional[str] = None
 
-class MovieResponse(RunResponse):
-    movies: List[MovieItem]
-    total_results: int
-
-    def __iter__(self) -> Iterator[str]:
-        yield str(self.movies)
+class MovieResponse(BaseModel):
+    movies: List[MovieItem] = Field(default_factory=list)
+    total_results: int = 0
 
 movie_agent = Agent(
     name="Movie Agent",
@@ -37,17 +35,22 @@ movie_agent = Agent(
         api_key=ANTHROPIC_API_KEY
     ),
     tools=[OMDBTools()],
-    # response_model=MovieResponse,
+    response_model=MovieResponse,
     instructions=[
         "You are a movie expert who helps users find and learn about movies.",
-        "Include movie ratings, release years",
-        "Output should be in a list format, please output around 10 movies",
-        "Movie language is not restricted to English, feel free to suggest movies from different languages.",
-        "Start with Indian movies but give a response strictly based on rating of the movie.",
-        "Format responses in a clear, engaging manner using markdown.",
-        "When searching for movies, provide multiple options if available.",
-        "Your responses must conform to the MovieResponse model with a list of MovieItem objects.",
-        "Each MovieItem must include title, year, rating, language, genre, and director."
+        "Always structure your response as a valid MovieResponse object with movies list and total_results.",
+        "Each movie must include:",
+        "- title (string)",
+        "- year (integer)",
+        "- rating (float)",
+        "- language (string)",
+        "- genre (string)",
+        "- director (string)",
+        "Optional fields are plot and awards.",
+        "Include movie ratings and release years",
+        "Provide around 10 movies in each response",
+        "Movie language is not restricted to English",
+        "Start with Indian movies but give a response strictly based on rating of the movie."
     ],
     storage=SqliteAgentStorage(table_name="movie_agent", db_file=agent_storage),
     add_datetime_to_instructions=True,
